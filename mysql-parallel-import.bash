@@ -1,9 +1,24 @@
 #!/bin/bash
 
+# checks
 if [ $# -lt 2 ] ; then
-  echo "USAGE $0 DUMP_FILE TABLE"
+  echo "Usage $0 DUMP_FILE TABLE_NAME [TABLE_NAMES_ASYNC]"
+  echo "   Example of TABLE_NAMES_ASYNC: table_name|table2_name "
   exit
 fi
+
+if ! command -v pv &> /dev/null
+then
+    echo "Please install pv: yum install pv"
+    exit
+fi
+
+if test ! -f "$1"; then
+    echo "$1 does not exists"
+    exit
+fi
+
+exclude=$3 # TABLE_NAMES_ASYNC
 
 start=`date`
 
@@ -12,7 +27,7 @@ rm -rf dump/
 mkdir -p dump/
 
 # optimizations
-prepend="SET GLOBAL max_connections = 100;"
+prepend="SET GLOBAL max_connections = 200;"
 prepend="$prepend SET GLOBAL net_buffer_length=1000000; "
 prepend="$prepend SET foreign_key_checks = 0; "
 prepend="$prepend SET UNIQUE_CHECKS = 0; "
@@ -45,16 +60,20 @@ rm dump.sql prepend.sql append.sql head table*
 
 # importing 
 mysql_import(){
-  mysql $2 < $1
-  echo "Imported $1..."
+  pv $1 | mysql $2
 }
 
 
 for file in *; do
     mysql_import "$file" "$2" &
+
+    tableName=${file%".sql"}
+    if [[ -z "$exclude" ]] || [[ ! $tableName =~ "$exclude" ]]; then
+      pids+=($!)
+    fi
 done
 
-wait
+wait "${pids[@]}" 
 
 # store end date to a variable
 end=`date`
