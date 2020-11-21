@@ -28,14 +28,11 @@ mkdir -p dump/
 
 # optimizations
 prepend="SET GLOBAL max_connections = 200;"
-prepend="$prepend SET GLOBAL net_buffer_length=1000000; "
-prepend="$prepend SET foreign_key_checks = 0; "
 prepend="$prepend SET UNIQUE_CHECKS = 0; "
 prepend="$prepend SET AUTOCOMMIT = 0; "
 echo $prepend > dump/prepend.sql
 
-append="SET foreign_key_checks = 1; "
-append="$append SET UNIQUE_CHECKS = 1; "
+append="SET UNIQUE_CHECKS = 1; "
 append="$append SET AUTOCOMMIT = 1; "
 append="$append COMMIT ; "
 echo $append > dump/append.sql
@@ -60,9 +57,8 @@ rm dump.sql prepend.sql append.sql head table*
 
 # importing 
 mysql_import(){
-  pv $1 | mysql $2
+  pv --name $1 $1 | mysql $2
 }
-
 
 for file in *; do
     mysql_import "$file" "$2" &
@@ -70,6 +66,8 @@ for file in *; do
     tableName=${file%".sql"}
     if [[ -z "$exclude" ]] || [[ ! $tableName =~ "$exclude" ]]; then
       pids+=($!)
+    else
+      echo "$tableName running async";
     fi
 done
 
@@ -78,5 +76,7 @@ wait "${pids[@]}"
 # store end date to a variable
 end=`date`
 
-echo "Start import: $start"
-echo "End import: $end"
+rm -rf dump
+
+echo "Start time: $start"
+echo "End time: $end"
