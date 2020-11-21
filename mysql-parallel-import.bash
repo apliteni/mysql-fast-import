@@ -7,12 +7,6 @@ if [ $# -lt 2 ] ; then
   exit
 fi
 
-if ! command -v pv &> /dev/null
-then
-    echo "Please install pv: yum install pv"
-    exit
-fi
-
 if test ! -f "$1"; then
     echo "$1 does not exists"
     exit
@@ -37,13 +31,10 @@ append="$append SET AUTOCOMMIT = 1; "
 append="$append COMMIT ; "
 echo $append > dump/append.sql
 
-
-# gunzip
-gunzip -c  $1 > dump/dump.sql
+cd dump/
 
 # split dump
-cd dump/
-csplit -s -ftable dump.sql "/-- Table structure for table/" {*}
+gzip -dc ../$1 | csplit -s -ftable ../dump.sql "/-- Table structure for table/" {*}
 
 # make complite micro dumps
 mv table00 head
@@ -53,21 +44,19 @@ for file in `ls -1 table*`; do
 done
 
 # cleaning
-rm dump.sql prepend.sql append.sql head table*
+rm ../dump.sql prepend.sql append.sql head table*
 
 # importing 
 mysql_import(){
-  pv --name $1 $1 | mysql $2
+  mysql $2 < $1
 }
 
 for file in *; do
     mysql_import "$file" "$2" &
 
     tableName=${file%".sql"}
-    if [[ -z "$exclude" ]] || [[ ! $tableName =~ "$exclude" ]]; then
+    if [[ -z "$exclude" ]] || [[ ! "$tableName" =~ $exclude ]]; then
       pids+=($!)
-    else
-      echo "$tableName running async";
     fi
 done
 
@@ -76,7 +65,6 @@ wait "${pids[@]}"
 # store end date to a variable
 end=`date`
 
-rm -rf dump
+rm -rf ../dump
 
-echo "Start time: $start"
-echo "End time: $end"
+echo "Some tables are being imported in background"
