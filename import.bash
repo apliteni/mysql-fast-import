@@ -12,7 +12,7 @@ if test ! -f "$1"; then
     exit
 fi
 
-exclude=$3 # TABLE_NAMES_ASYNC
+asyncImports=$3 # TABLE_NAMES_ASYNC
 
 start=`date`
 
@@ -55,7 +55,7 @@ for file in *; do
     mysql_import "$file" "$2" &
 
     tableName=${file%".sql"}
-    if [[ -z "$exclude" ]] || [[ ! "$tableName" =~ $exclude ]]; then
+    if [[ -z "$asyncImports" ]] || [[ ! "$tableName" =~ $asyncImports ]]; then
       pids+=($!)
     fi
 done
