@@ -1,102 +1,70 @@
-#!/usr/bin/env bash
-set -e -o pipefail
+#!/bin/bash
 
 # checks
-
-if [ $# -lt 3 ] ; then
-  echo "Usage: $0 TEMPLATE_NAME CLUSTER_NAME PROJECT_NAME"
-  echo "Available templates: go"
+if [ $# -lt 2 ] ; then
+  echo "Usage $0 DUMP_FILE TABLE_NAME [TABLE_NAMES_ASYNC]"
+  echo "   Example of TABLE_NAMES_ASYNC: table_name|table2_name "
   exit
 fi
 
-if ! command -v rancher &> /dev/null
-then
-    echo "Error: 'rancher' must be installed"
+if test ! -f "$1"; then
+    echo "$1 does not exists"
     exit
 fi
 
-if ! command -v helm &> /dev/null
-then
-    echo "Error: 'helm' must be installed"
-    exit
-fi
+exclude=$3 # TABLE_NAMES_ASYNC
 
+start=`date`
 
-template=$1
-clusterName=$2
-projectName=$(echo $3        \
-  | sed 's/\./-/g'       \
-  | sed 's/\([a-z]\)\([A-Z]\)/\1-\2/g'       \
-  | sed 's/\([A-Z]\{2,\}\)\([A-Z]\)/\1-\2/g' \
-  | tr '[:upper:]' '[:lower:]'
-  )
+# prepare directory
+rm -rf dump/
+mkdir -p dump/
 
+# optimizations
+prepend="SET GLOBAL max_connections = 200;"
+prepend="$prepend SET UNIQUE_CHECKS = 0; "
+prepend="$prepend SET AUTOCOMMIT = 0; "
+echo $prepend > dump/prepend.sql
 
-if [ ! -f "shared-tools/clusters/${clusterName}.sh" ] ; then
-  echo "${clusterName} does not exists"
-  exit
-fi
+append="SET UNIQUE_CHECKS = 1; "
+append="$append SET AUTOCOMMIT = 1; "
+append="$append COMMIT ; "
+echo $append > dump/append.sql
 
-# copy gitlab-ci.yml
+cd dump/
 
-cp "shared-tools/templates/.gitlab-ci.${template}.yml" .gitlab-ci.yml
+# split dump
+gzip -dc ../$1 | csplit -s -ftable ../dump.sql "/-- Table structure for table/" {*}
 
+# make complite micro dumps
+mv table00 head
+for file in `ls -1 table*`; do
+      tableName=`head -n1 $file | cut -d$'\x60' -f2`
+      cat head prepend.sql $file append.sql > "$tableName.sql"
+done
 
-function press_enter() {
-  read -n 0 -p "Press ENTER to continue"
+# cleaning
+rm ../dump.sql prepend.sql append.sql head table*
+
+# importing 
+mysql_import(){
+  mysql $2 < $1
 }
 
-# prepare k8s namespace
+for file in *; do
+    mysql_import "$file" "$2" &
 
-echo "Make sure you're in correct context!"
-rancher context switch
+    tableName=${file%".sql"}
+    if [[ -z "$exclude" ]] || [[ ! "$tableName" =~ $exclude ]]; then
+      pids+=($!)
+    fi
+done
 
-rancher kubectl create namespace ${projectName} || true
-rancher kubectl apply -f shared-tools/helm/v3/manifests/serviceaccount.yaml --namespace=${projectName}
-secretName=$(rancher kubectl -n ${projectName} get secret | awk '/^helm-deploy-/{print $1}')
-kubeToken=$(rancher kubectl describe secret ${secretName} -n ${projectName} | awk '$1=="token:"{print $2}')
+wait "${pids[@]}" 
 
+# store end date to a variable
+end=`date`
 
-# env variables
+rm -rf ../dump
 
-echo "1. Open Project > Settings > Repository > Deploy Tokens"
-echo "2. Create new deploy token with checked feature 'read_registry'. Save the created token somewhere."
-
-
-echo "3. Open Gitlab > Project > Settings > CI / CD > Variables. Add variables: "
-echo ""
-echo "KUBE_GITLAB_USERNAME = (use deploy token name)"
-echo ""
-
-echo "KUBE_GITLAB_TOKEN = (use deploy token code)"
-echo ""
-
-echo "KUBE_CLUSTER_NAME = ${clusterName}"
-echo ""
-echo "KUBE_TOKEN="
-echo "$kubeToken"
-echo ""
-press_enter
-
-
-# add chart
-
-mkdir -p ci/chart
-
-cp "shared-tools/templates/chart/Chart.yaml" "ci/chart/Chart.yaml"
-sed "s/PROJECT_NAME/$projectName/" "./ci/chart/Chart.yaml" > tmp.txt && mv tmp.txt "./ci/chart/Chart.yaml"
-sed "s/PROJECT_NAME/$projectName/" "./ci/chart/values.yaml" > tmp.txt && mv tmp.txt "./ci/chart/values.yaml"
-
-cp "shared-tools/templates/chart/values.yaml" "ci/chart/values.yaml"
-
-echo "Please enter domain name (leave empty if no needed): "
-read domainName
-
-if [ -z "$domainName" ]
-then
-  sed "s/true # ingress/false # ingress /" "./ci/chart/values.yaml" > tmp.txt && mv tmp.txt "./ci/chart/values.yaml"
-else
-  sed "s/domainname.tld/$domainName/" "./ci/chart/values.yaml" > tmp.txt && mv tmp.txt "./ci/chart/values.yaml"
-fi
-
-echo "Done!"
+echo "Some parts of the dump will be imported in background. "
