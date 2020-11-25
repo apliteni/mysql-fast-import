@@ -5,5 +5,5 @@
 ```bash
 $ curl https://raw.githubusercontent.com/apliteni/mysql-fast-import/main/import.bash > import
 
-$ ./import dump.sql.gz mydb "stats|sessions|another_large_table"
+$ bash ./import -f backup.sql.gz -d booking -a table_name|table2_name -f incorrect -t correct
 ```
