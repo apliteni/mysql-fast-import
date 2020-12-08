@@ -15,7 +15,7 @@ replaceFrom=''
 replaceTo=''
 none_interactive=''
 
-while getopts ":f:d:a:r:t:nt" opt; do
+while getopts ":f:d:a:r:t:n" opt; do
     case $opt in
         h)
             show_help
@@ -31,7 +31,7 @@ while getopts ":f:d:a:r:t:nt" opt; do
             ;;
         t)  replaceTo=$OPTARG
             ;;
-        nt) none_interactive=$OPTARG
+        n) none_interactive=$OPTARG
             ;;
         \? ) echo "Invalid option: $OPTARG" 1>&2
             show_help >&2
