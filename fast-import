@@ -2,8 +2,10 @@
 
 # CLI
 show_help() {
-  echo "Usage $0 -f DUMP_FILE -d STRING [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO]"
-  echo "Example: $0 -f backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct"
+  echo "Usage $0 -F DUMP_FILE [-d DATABASE_NAME] [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO]"
+  echo "Example: $0 -F backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct"
+  echo "or simple run to use with default options"
+  echo "-F backup.sql.gz"
   exit 1
 }
 
