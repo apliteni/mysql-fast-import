@@ -9,13 +9,13 @@ show_help() {
 
 start=`date`
 dumpFile=''
-dbName='keitaro'
+dbName=''
 asyncImports=''
 replaceFrom=''
 replaceTo=''
 none_interactive=''
 
-while getopts ":f:d:a:r:t:none_interactive" opt; do
+while getopts ":f:d:a:r:t:nt" opt; do
     case $opt in
         h)
             show_help
@@ -23,11 +23,15 @@ while getopts ":f:d:a:r:t:none_interactive" opt; do
             ;;
         f)  dumpFile=$OPTARG
             ;;
+        d)  dbName=$OPTARG
+            ;;
         a)  asyncImports=$OPTARG
             ;;
         r)  replaceFrom=$OPTARG
             ;;
         t)  replaceTo=$OPTARG
+            ;;
+        nt) none_interactive=$OPTARG
             ;;
         \? ) echo "Invalid option: $OPTARG" 1>&2
             show_help >&2
@@ -37,16 +41,18 @@ done
 
 shift $((OPTIND -1))
 
-exec 3<>/dev/tty
-read -u 3 -p "Этот скрипт уничтожит данные в базе keitaro, вы уверены что хотите продолжить (yes|no)" yn
-case $yn in
-    [Yy]*) ;;
-    [Nn]*) exit
-           ;;
-    * )    echo "Please answer yes or no."
-           exit
-           ;;
-esac
+if [[ ! -z "$none_interactive" ]]; then
+  exec 3<>/dev/tty
+  read -u 3 -p "Этот скрипт уничтожит данные в базе keitaro, вы уверены что хотите продолжить (yes|no)" yn
+  case $yn in
+      [Yy]*) ;;
+      [Nn]*) exit
+             ;;
+      * )    echo "Please answer yes or no."
+             exit
+             ;;
+  esac
+fi
 
 mysql_command=$(mysql --execute='SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST WHERE COMMAND = "Query" AND DB = "keitaro"';)
 
@@ -63,6 +69,14 @@ fi
 if test ! -f "$dumpFile"; then
     echo "keitaro dump does not exists"
     exit 1
+fi
+
+if [[ -z "${dbName}" ]]; then
+    dbName='keitaro'
+fi
+
+if [[ -z "$asyncImports" ]]; then
+  asyncImports="_clicks|_ref_|visitors"
 fi
 
 # prepare directory
@@ -119,9 +133,6 @@ for file in *; do
     mysql_import "$file" "$dbName" &
 
     tableName=${file%".sql"}
-    if [[ -z "$asyncImports" ]]; then
-      asyncImports="_clicks|_ref_|visitors"
-    fi
     if [[ ! "$tableName" =~ $asyncImports ]]; then
       pids+=($!)
     fi
@@ -135,5 +146,3 @@ end=`date`
 rm -rf ../dump ../${dumpFile}
 
 echo "Some parts of the dump will be imported in background. "
-echo "$start"
-echo "$end"
