@@ -30,8 +30,6 @@ while :; do
     shift
 done
 
-shift $((OPTIND -1))
-
 exec 3<>/dev/tty
 read -u 3 -p "Этот скрипт уничтожит данные в базе keitaro, вы уверены что хотите продолжить (yes|no)" yn
 case $yn in
