@@ -41,7 +41,7 @@ done
 
 shift $((OPTIND -1))
 
-if [[ -z "$none_interactive" ]]; then
+if [[ "$none_interactive" != 'yes' ]]; then
   exec 3<>/dev/tty
   read -u 3 -p "Этот скрипт уничтожит данные в базе keitaro, вы уверены что хотите продолжить (yes|no)" yn
   case $yn in
