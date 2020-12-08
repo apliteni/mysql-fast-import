@@ -21,7 +21,7 @@ while getopts "F:d:a:r:t:f" opt; do
             show_help
             exit 0
             ;;
-        f)  dumpFile=$OPTARG
+        F)  dumpFile=$OPTARG
             ;;
         d)  dbName=$OPTARG
             ;;
@@ -31,7 +31,7 @@ while getopts "F:d:a:r:t:f" opt; do
             ;;
         t)  replaceTo=$OPTARG
             ;;
-        nt) none_interactive=$OPTARG
+        f) FORCED_INSTALL=true
             ;;
         \? ) echo "Invalid option: $OPTARG" 1>&2
             show_help >&2
@@ -41,7 +41,7 @@ done
 
 shift $((OPTIND -1))
 
-if [[ "$none_interactive" != 'yes' ]]; then
+if [[ "$FORCED_INSTALL" = true ]]; then
   exec 3<>/dev/tty
   read -u 3 -p "Этот скрипт уничтожит данные в базе keitaro, вы уверены что хотите продолжить (yes|no)" yn
   case $yn in
