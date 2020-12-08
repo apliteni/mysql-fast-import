@@ -7,29 +7,35 @@ show_help() {
   exit 1
 }
 
-while :; do
-    case $1 in
-        -h|--help) show_help
-        ;;
-        -f) dumpFile=$1
-        ;;
-        -d) dbName=$2
-        ;;
-        -a) asyncImports=$3
-        ;;
-        -r) replaceFrom=$4
-        ;;
-        -t) replaceTo=$5
-        ;;
-        -n|--none-interactive) echo 'None interactive'
-                               exit 2
-        ;;
-        -*) echo "$0: Unrecognized option $1" >&2
+start=`date`
+dumpFile=''
+dbName='keitaro'
+asyncImports=''
+replaceFrom=''
+replaceTo=''
+none_interactive=''
+
+while getopts ":f:d:a:r:t:none_interactive" opt; do
+    case $opt in
+        h)
+            show_help
+            exit 0
+            ;;
+        f)  dumpFile=$OPTARG
+            ;;
+        a)  asyncImports=$OPTARG
+            ;;
+        r)  replaceFrom=$OPTARG
+            ;;
+        t)  replaceTo=$OPTARG
+            ;;
+        \? ) echo "Invalid option: $OPTARG" 1>&2
             show_help >&2
-        ;;
+            ;;
     esac
-    shift
 done
+
+shift $((OPTIND -1))
 
 exec 3<>/dev/tty
 read -u 3 -p "Этот скрипт уничтожит данные в базе keitaro, вы уверены что хотите продолжить (yes|no)" yn
@@ -126,6 +132,8 @@ wait "${pids[@]}"
 # store end date to a variable
 end=`date`
 
-#rm -rf ../dump ../${dumpFile}
+rm -rf ../dump ../${dumpFile}
 
 echo "Some parts of the dump will be imported in background. "
+echo "$start"
+echo "$end"
