@@ -27,7 +27,7 @@ while :; do
             show_help >&2
         ;;
         *) echo "Please run -h or --help to show how to use"
-           break
+           exit 1
         ;;
     esac
     shift
@@ -130,6 +130,6 @@ wait "${pids[@]}"
 # store end date to a variable
 end=`date`
 
-rm -rf ../dump ../${dumpFile}
+#rm -rf ../dump ../${dumpFile}
 
 echo "Some parts of the dump will be imported in background. "
