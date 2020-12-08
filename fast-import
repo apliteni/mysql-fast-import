@@ -26,9 +26,6 @@ while :; do
         -*) echo "$0: Unrecognized option $1" >&2
             show_help >&2
         ;;
-        *) echo "Please run -h or --help to show how to use"
-           exit 1
-        ;;
     esac
     shift
 done
