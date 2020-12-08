@@ -7,28 +7,27 @@ show_help() {
   exit 1
 }
 
-while :; do
-    case $1 in
-        -h|--help) show_help
-        ;;
-        -f) dumpFile="SET"
-        ;;
-        -d) dbName="SET"
-        ;;
-        -a) asyncImports="SET"
-        ;;
-        -r) replaceFrom="SET"
-        ;;
-        -t) replaceTo="SET"
-        ;;
-        -n|--none-interactive) echo 'None interactive'
-        ;;
-        -*) echo "$0: Unrecognized option $1" >&2
+while getopts ":f:d:a:r:t:none_interactive" opt; do
+    case $opt in
+        h)
+            show_help
+            exit 0
+            ;;
+        f)  dumpFile=$OPTARG
+            ;;
+        a)  asyncImports=$OPTARG
+            ;;
+        r)  replaceFrom=$OPTARG
+            ;;
+        t)  replaceTo=$OPTARG
+            ;;
+        \? ) echo "Invalid option: $OPTARG" 1>&2
             show_help >&2
-        ;;
+            ;;
     esac
-    shift
 done
+
+shift $((OPTIND -1))
 
 exec 3<>/dev/tty
 read -u 3 -p "Этот скрипт уничтожит данные в базе keitaro, вы уверены что хотите продолжить (yes|no)" yn
