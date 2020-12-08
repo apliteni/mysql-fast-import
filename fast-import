@@ -13,7 +13,7 @@ dbName=''
 asyncImports=''
 replaceFrom=''
 replaceTo=''
-none_interactive=''
+FORCED_INSTALL=false
 
 while getopts "F:d:a:r:t:f" opt; do
     case $opt in
@@ -41,7 +41,7 @@ done
 
 shift $((OPTIND -1))
 
-if [[ "$FORCED_INSTALL" = true ]]; then
+if [[ "$FORCED_INSTALL" = false ]]; then
   exec 3<>/dev/tty
   read -u 3 -p "Этот скрипт уничтожит данные в базе keitaro, вы уверены что хотите продолжить (yes|no)" yn
   case $yn in
