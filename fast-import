@@ -15,7 +15,7 @@ replaceFrom=''
 replaceTo=''
 none_interactive=''
 
-while getopts ":f:d:a:r:t:nt:" opt; do
+while getopts "F:d:a:r:t:f" opt; do
     case $opt in
         h)
             show_help
