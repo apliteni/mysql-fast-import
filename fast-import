@@ -1,5 +1,40 @@
 #!/usr/bin/env bash
 
+# CLI
+show_help() {
+  echo "Usage $0 -f DUMP_FILE -d STRING [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO]"
+  echo "Example: $0 -f backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct"
+  exit 1
+}
+
+while :; do
+    case $1 in
+        -h|--help) show_help
+        ;;
+        -f) dumpFile="SET"
+        ;;
+        -d) dbName="SET"
+        ;;
+        -a) asyncImports="SET"
+        ;;
+        -r) replaceFrom="SET"
+        ;;
+        -t) replaceTo="SET"
+        ;;
+        -n|--none-interactive) echo 'None interactive'
+        ;;
+        -*) echo "$0: Unrecognized option $1" >&2
+            show_help >&2
+        ;;
+        *) echo "Please run -h or --help to show how to use"
+           break
+        ;;
+    esac
+    shift
+done
+
+shift $((OPTIND -1))
+
 exec 3<>/dev/tty
 read -u 3 -p "Этот скрипт уничтожит данные в базе keitaro, вы уверены что хотите продолжить (yes|no)" yn
 case $yn in
@@ -17,43 +52,6 @@ if [[ $mysql_command ]]; then
     echo "База Keitaro уже используется другим процессом"
     exit 1
 fi
-
-# CLI
-show_help() {
-  echo "Usage $0 -f DUMP_FILE -d STRING [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO]"
-  echo "Example: $0 -f backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct"
-  exit 1
-}
-
-start=`date`
-dumpFile=''
-dbName='keitaro'
-asyncImports=''
-replaceFrom=''
-replaceTo=''
-none_interactive=''
-
-while getopts ":f:d:a:r:t:none_interactive" opt; do
-    case $opt in
-        h)
-            show_help
-            exit 0
-            ;;
-        f)  dumpFile=$OPTARG
-            ;;
-        a)  asyncImports=$OPTARG
-            ;;
-        r)  replaceFrom=$OPTARG
-            ;;
-        t)  replaceTo=$OPTARG
-            ;;
-        \? ) echo "Invalid option: $OPTARG" 1>&2
-            show_help >&2
-            ;;
-    esac
-done
-
-shift $((OPTIND -1))
 
 if [[ -z "${dumpFile}" ]]; then
     echo "-d is required"
@@ -135,5 +133,3 @@ end=`date`
 rm -rf ../dump ../${dumpFile}
 
 echo "Some parts of the dump will be imported in background. "
-echo "$start"
-echo "$end"
