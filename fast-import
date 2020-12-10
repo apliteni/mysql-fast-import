@@ -5,16 +5,16 @@ show_help() {
   echo "Usage $0 -F DUMP_FILE [-d DATABASE_NAME] [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO]"
   echo "Example: $0 -F backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct"
   echo "or simple run to use with default options"
-  echo "-F backup.sql.gz"
+  echo "bash -F backup.sql.gz"
   exit 1
 }
 
 start=`date`
-dumpFile=''
-dbName=''
-asyncImports=''
-replaceFrom=''
-replaceTo=''
+dump_file=''
+db_name=''
+async_imports=''
+replace_from=''
+replace_to=''
 FORCED_INSTALL=false
 
 while getopts "F:d:a:r:t:f" opt; do
@@ -23,15 +23,15 @@ while getopts "F:d:a:r:t:f" opt; do
             show_help
             exit 0
             ;;
-        F)  dumpFile=$OPTARG
+        F)  dump_file=$OPTARG
             ;;
-        d)  dbName=$OPTARG
+        d)  db_name=$OPTARG
             ;;
-        a)  asyncImports=$OPTARG
+        a)  async_imports=$OPTARG
             ;;
-        r)  replaceFrom=$OPTARG
+        r)  replace_from=$OPTARG
             ;;
-        t)  replaceTo=$OPTARG
+        t)  replace_to=$OPTARG
             ;;
         f) FORCED_INSTALL=true
             ;;
@@ -63,22 +63,22 @@ if [[ $mysql_command ]]; then
     exit 1
 fi
 
-if [[ -z "${dumpFile}" ]]; then
+if [[ -z "${dump_file}" ]]; then
     echo "-d is required"
     show_help
 fi
 
-if test ! -f "$dumpFile"; then
+if test ! -f "$dump_file"; then
     echo "keitaro dump does not exists"
     exit 1
 fi
 
-if [[ -z "${dbName}" ]]; then
-    dbName='keitaro'
+if [[ -z "${db_name}" ]]; then
+    db_name='keitaro'
 fi
 
-if [[ -z "$asyncImports" ]]; then
-  asyncImports="_clicks|_ref_|visitors"
+if [[ -z "$async_imports" ]]; then
+  async_imports="_clicks|_ref_|visitors"
 fi
 
 # prepare directory
@@ -99,7 +99,7 @@ echo $append > dump/append.sql
 cd dump/
 
 # unpack
-if gzip -dc ../${dumpFile} | csplit -s -ftable - "/-- Table structure for table/" {*}; then
+if gzip -dc ../${dump_file} | csplit -s -ftable - "/-- Table structure for table/" {*}; then
   echo 'Success split dump tables'
 else
   echo -e '\e[31mDump tables split failed\e[0m'
@@ -107,24 +107,24 @@ else
 fi
 
 replaceInFile() {
-  if [[ ! -z "${replaceFrom}" ]] &&  [[ $replaceFrom != $replaceTo ]]; then
-    sed -i "s/$replaceFrom/$replaceTo/" $1
+  if [[ ! -z "${replace_from}" ]] &&  [[ $replace_from != $replace_to ]]; then
+    sed -i "s/$replace_from/$replace_to/" $1
   fi
 }
 
 # make complite micro dumps
 mv table00 head
 for file in `ls -1 table*`; do
-  tableName=`head -n1 $file | cut -d$'\x60' -f2`
-  cat head prepend.sql $file append.sql > "$tableName.sql"
-  replaceInFile "$tableName.sql"
+  table_name=`head -n1 $file | cut -d$'\x60' -f2`
+  cat head prepend.sql $file append.sql > "$table_name.sql"
+  replaceInFile "$table_name.sql"
 done
 
 # cleaning
 rm prepend.sql append.sql head table*
 
 # clean db
-mysql -e "DROP DATABASE $dbName; CREATE DATABASE $dbName"
+mysql -e "DROP DATABASE $db_name; CREATE DATABASE $db_name"
 
 # importing
 mysql_import(){
@@ -132,10 +132,10 @@ mysql_import(){
 }
 
 for file in *; do
-    mysql_import "$file" "$dbName" &
+    mysql_import "$file" "$db_name" &
 
-    tableName=${file%".sql"}
-    if [[ ! "$tableName" =~ $asyncImports ]]; then
+    table_name=${file%".sql"}
+    if [[ ! "$table_name" =~ $async_imports ]]; then
       pids+=($!)
     fi
 done
@@ -145,6 +145,6 @@ wait "${pids[@]}"
 # store end date to a variable
 end=`date`
 
-rm -rf ../dump ../${dumpFile}
+rm -rf ../dump ../${dump_file}
 
 echo "Some parts of the dump will be imported in background. "
