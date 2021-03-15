@@ -9,13 +9,15 @@ show_help() {
   exit 1
 }
 
-start=`date`
+DUMP_DIR='dump'
+
 dump_file=''
 db_name=''
-async_imports=''
-replace_from=''
-replace_to=''
-FORCED_INSTALL=false
+asynchronously_imported_tables_regex=''
+replace_table_prefix_from=''
+replace_table_prefix_to=''
+force_import=false
+
 
 while getopts "F:d:a:r:t:f" opt; do
     case $opt in
@@ -27,13 +29,13 @@ while getopts "F:d:a:r:t:f" opt; do
             ;;
         d)  db_name=$OPTARG
             ;;
-        a)  async_imports=$OPTARG
+        a)  asynchronously_imported_tables_regex=$OPTARG
             ;;
-        r)  replace_from=$OPTARG
+        r)  replace_table_prefix_from=$OPTARG
             ;;
-        t)  replace_to=$OPTARG
+        t)  replace_table_prefix_to=$OPTARG
             ;;
-        f) FORCED_INSTALL=true
+        f) force_import=true
             ;;
         \? ) echo "Invalid option: $OPTARG" 1>&2
             show_help >&2
@@ -43,9 +45,9 @@ done
 
 shift $((OPTIND -1))
 
-if [[ "$FORCED_INSTALL" = false ]]; then
+if [[ "$force_import" = false ]]; then
   exec 3<>/dev/tty
-  read -u 3 -p "Этот скрипт уничтожит данные в базе keitaro, вы уверены что хотите продолжить (yes|no)" yn
+  read -u 3 -p "This script will destroy the data in the keitaro database, are you sure you want to continue (yes|no)" yn
   case $yn in
       [Yy]*) ;;
       [Nn]*) exit
@@ -56,95 +58,109 @@ if [[ "$FORCED_INSTALL" = false ]]; then
   esac
 fi
 
-mysql_command=$(mysql --execute='SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST WHERE COMMAND = "Query" AND DB = "keitaro"';)
-
-if [[ $mysql_command ]]; then
-    echo "База Keitaro уже используется другим процессом"
+ensure_nobody_is_using_database() {
+  local parallel_processes_list=$(mysql --execute='SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST WHERE COMMAND = "Query" AND DB = "keitaro"';)
+  if [[ $parallel_processes_list ]]; then
+    echo "Database Keitaro used by another process"
     exit 1
 fi
+}
+
+ensure_nobody_is_using_database
 
 if [[ -z "${dump_file}" ]]; then
     echo "-d is required"
     show_help
 fi
 
-if test ! -f "$dump_file"; then
+if [[ ! -f "$dump_file" ]]; then
     echo "keitaro dump does not exists"
     exit 1
 fi
 
 if [[ -z "${db_name}" ]]; then
-    db_name='keitaro'
+    echo "database name does not set"
+    exit 1
 fi
 
-if [[ -z "$async_imports" ]]; then
-  async_imports="_clicks|_ref_|visitors"
+if [[ -z "${asynchronously_imported_tables_regex}" ]]; then
+    echo "tables name does not set"
+    exit 1
 fi
 
-# prepare directory
-rm -rf dump/
-mkdir -p dump/
+prepare_directory() {
+  rm -rf $DUMP_DIR
+  mkdir -p $DUMP_DIR
+}
+prepare_directory
 
-# optimizations
-prepend="SET GLOBAL max_connections = 200;"
-prepend="$prepend SET UNIQUE_CHECKS = 0; "
-prepend="$prepend SET AUTOCOMMIT = 0; "
-echo $prepend > dump/prepend.sql
+optimise_db() {
+  prepend="SET GLOBAL max_connections = 200;"
+  prepend="$prepend SET UNIQUE_CHECKS = 0; "
+  prepend="$prepend SET AUTOCOMMIT = 0; "
+  echo $prepend > $DUMP_DIR/prepend.sql
 
-append="SET UNIQUE_CHECKS = 1; "
-append="$append SET AUTOCOMMIT = 1; "
-append="$append COMMIT ; "
-echo $append > dump/append.sql
+  append="SET UNIQUE_CHECKS = 1; "
+  append="$append SET AUTOCOMMIT = 1; "
+  append="$append COMMIT ; "
+  echo $append > $DUMP_DIR/append.sql
+}
+optimise_db
 
-cd dump/
+cd $DUMP_DIR
 
-# unpack
-if gzip -dc ../${dump_file} | csplit -s -ftable - "/-- Table structure for table/" {*}; then
-  echo 'Success split dump tables'
-else
-  echo -e '\e[31mDump tables split failed\e[0m'
-  exit 1
-fi
+unpack_db_dump() {
+  if gzip -dc ../${dump_file} | csplit -s -ftable - "/-- Table structure for table/" {*}; then
+    echo 'Success split dump tables'
+  else
+    echo -e '\e[31mDump tables split failed\e[0m'
+    exit 1
+  fi
+}
+unpack_db_dump
 
-replaceInFile() {
-  if [[ ! -z "${replace_from}" ]] &&  [[ $replace_from != $replace_to ]]; then
-    sed -i "s/$replace_from/$replace_to/" $1
+replace_in_file() {
+  if [[ ! -z "${replace_table_prefix_from}" ]] &&  [[ $replace_table_prefix_from != $replace_table_prefix_to ]]; then
+    if [[ -z "${replace_table_prefix_to}" ]]; then
+      replace_table_prefix_to='keitaro_'
+    fi
+    sed -i "s/$replace_table_prefix_from/$replace_table_prefix_to/" $1
   fi
 }
 
-# make complite micro dumps
-mv table00 head
-for file in `ls -1 table*`; do
-  table_name=`head -n1 $file | cut -d$'\x60' -f2`
-  cat head prepend.sql $file append.sql > "$table_name.sql"
-  replaceInFile "$table_name.sql"
-done
+make_micro_dumps() {
+  mv table00 head
+  for file in `ls -1 table*`; do
+    table_name=`head -n1 $file | cut -d$'\x60' -f2`
+    cat head prepend.sql $file append.sql > "$table_name.sql"
+    replace_in_file "$table_name.sql"
+  done
+}
+make_micro_dumps
 
-# cleaning
-rm prepend.sql append.sql head table*
+clean_up_db() {
+  rm prepend.sql append.sql head table*
+  mysql -e "DROP DATABASE $db_name; CREATE DATABASE $db_name"
+}
+clean_up_db
 
-# clean db
-mysql -e "DROP DATABASE $db_name; CREATE DATABASE $db_name"
-
-# importing
 mysql_import(){
   mysql $2 < $1
 }
 
-for file in *; do
+async_restore_dump() {
+  for file in *; do
     mysql_import "$file" "$db_name" &
 
     table_name=${file%".sql"}
-    if [[ ! "$table_name" =~ $async_imports ]]; then
+    if [[ ! "$table_name" =~ $asynchronously_imported_tables_regex ]]; then
       pids+=($!)
     fi
-done
+  done
 
-wait "${pids[@]}"
-
-# store end date to a variable
-end=`date`
-
-rm -rf ../dump ../${dump_file}
+  wait "${pids[@]}"
+}
+async_restore_dump
+rm -rf ../$DUMP_DIR ../${dump_file}
 
 echo "Some parts of the dump will be imported in background. "
