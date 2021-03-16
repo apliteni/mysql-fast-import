@@ -125,6 +125,7 @@ replace_in_file() {
       replace_table_prefix_to='keitaro_'
     fi
     sed -i "s/$replace_table_prefix_from/$replace_table_prefix_to/" $1
+    echo "replace table prefix from ${replace_table_prefix_from} to ${replace_table_prefix_to}"
   fi
 }
 
@@ -135,6 +136,7 @@ make_micro_dumps() {
     cat head prepend.sql $file append.sql > "$table_name.sql"
     replace_in_file "$table_name.sql"
   done
+  echo "Split to micro dumps successfully completed"
 }
 make_micro_dumps
 
@@ -159,6 +161,7 @@ async_restore_dump() {
   done
 
   wait "${pids[@]}"
+  echo "Async dump restore successfully completed"
 }
 async_restore_dump
 rm -rf ../$DUMP_DIR ../${dump_file}
