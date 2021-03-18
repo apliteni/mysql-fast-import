@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 
-# CLI
+dump_dir=$(mktemp -d)
+force_import=false
+
+parse_options
+ensure_options_are_valid
+ensure_nobody_is_using_database
+
+make_dump_dir
+make_micro_dumps
+clean_up_db
+mysql_import
+async_restore_dump
+remove_dump_dir
+
 show_help() {
   echo "Usage $0 -F DUMP_FILE [-d DATABASE_NAME] [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO]"
   echo "Example: $0 -F backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct"
@@ -9,127 +22,122 @@ show_help() {
   exit 1
 }
 
-DUMP_DIR='dump'
+parse_options() {
+  while getopts "F:d:a:r:t:f" opt; do
+      case $opt in
+          h)
+              show_help
+              exit 0
+              ;;
+          F)  dump_path=$OPTARG
+              ;;
+          d)  db_name=$OPTARG
+              ;;
+          a)  asynchronously_imported_tables_regex=$OPTARG
+              ;;
+          r)  replace_table_prefix_from=$OPTARG
+              ;;
+          t)  replace_table_prefix_to=$OPTARG
+              ;;
+          f) force_import=true
+              ;;
+          \? ) echo "Invalid option: $OPTARG" 1>&2
+              show_help >&2
+              ;;
+      esac
+  done
 
-dump_file=''
-db_name=''
-asynchronously_imported_tables_regex=''
-replace_table_prefix_from=''
-replace_table_prefix_to=''
-force_import=false
+  shift $((OPTIND -1))
 
-
-while getopts "F:d:a:r:t:f" opt; do
-    case $opt in
-        h)
-            show_help
-            exit 0
-            ;;
-        F)  dump_file=$OPTARG
-            ;;
-        d)  db_name=$OPTARG
-            ;;
-        a)  asynchronously_imported_tables_regex=$OPTARG
-            ;;
-        r)  replace_table_prefix_from=$OPTARG
-            ;;
-        t)  replace_table_prefix_to=$OPTARG
-            ;;
-        f) force_import=true
-            ;;
-        \? ) echo "Invalid option: $OPTARG" 1>&2
-            show_help >&2
-            ;;
+  if [[ "$force_import" = false ]]; then
+    exec 3<>/dev/tty
+    read -u 3 -p "This script will destroy the data in the keitaro database, are you sure you want to continue (yes|no)" yn
+    case $yn in
+        [Yy]*) ;;
+        [Nn]*) exit
+               ;;
+        * )    echo "Please answer yes or no."
+               exit
+               ;;
     esac
-done
+  fi
 
-shift $((OPTIND -1))
-
-if [[ "$force_import" = false ]]; then
-  exec 3<>/dev/tty
-  read -u 3 -p "This script will destroy the data in the keitaro database, are you sure you want to continue (yes|no)" yn
-  case $yn in
-      [Yy]*) ;;
-      [Nn]*) exit
-             ;;
-      * )    echo "Please answer yes or no."
-             exit
-             ;;
-  esac
-fi
+}
 
 ensure_nobody_is_using_database() {
   local parallel_processes_list=$(mysql --execute='SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST WHERE COMMAND = "Query" AND DB = "keitaro"';)
   if [[ $parallel_processes_list ]]; then
     echo "Database Keitaro used by another process"
     exit 1
-fi
+  fi
 }
 
-ensure_nobody_is_using_database
-
-if [[ -z "${dump_file}" ]]; then
+ensure_options_are_valid() {
+  if [[ -z "${dump_path}" ]]; then
     echo "-d is required"
     show_help
-fi
+  fi
 
-if [[ ! -f "$dump_file" ]]; then
-    echo "keitaro dump does not exists"
-    exit 1
-fi
+  if [[ ! -f "$dump_path" ]]; then
+      echo "keitaro dump does not exists"
+      exit 1
+  fi
 
-if [[ -z "${db_name}" ]]; then
-    echo "database name does not set"
-    exit 1
-fi
+  if [[ -z "${db_name}" ]]; then
+      echo "database name does not set"
+      exit 1
+  fi
 
-if [[ -z "${asynchronously_imported_tables_regex}" ]]; then
-    echo "tables name does not set"
-    exit 1
-fi
-
-prepare_directory() {
-  rm -rf $DUMP_DIR
-  mkdir -p $DUMP_DIR
+  if [[ -z "${asynchronously_imported_tables_regex}" ]]; then
+      echo "tables name does not set"
+      exit 1
+  fi
 }
-prepare_directory
 
-optimise_db() {
+make_dump_dir() {
+  dump_dir=$(mktemp -d)
+  cd $dump_dir
+}
+
+make_micro_dumps() {
+  generate_micro_dump_optimization_sql
+  unpack_db_dump_to_chunks
+  replace_in_file
+  adapt_chunks_to_micro_dumps
+}
+
+generate_micro_dump_optimization_sql () {
   prepend="SET GLOBAL max_connections = 200;"
   prepend="$prepend SET UNIQUE_CHECKS = 0; "
   prepend="$prepend SET AUTOCOMMIT = 0; "
-  echo $prepend > $DUMP_DIR/prepend.sql
+  echo $prepend > $dump_dir/prepend.sql
 
   append="SET UNIQUE_CHECKS = 1; "
   append="$append SET AUTOCOMMIT = 1; "
   append="$append COMMIT ; "
-  echo $append > $DUMP_DIR/append.sql
+  echo $append > $dump_dir/append.sql
 }
-optimise_db
 
-cd $DUMP_DIR
-
-unpack_db_dump() {
-  if gzip -dc ../${dump_file} | csplit -s -ftable - "/-- Table structure for table/" {*}; then
+unpack_db_dump_to_chunks() {
+  pushd "${dump_path}"
+  if gzip -dc ${dump_path} | csplit -s -ftable - "/-- Table structure for table/" {*}; then
     echo 'Success split dump tables'
   else
     echo -e '\e[31mDump tables split failed\e[0m'
     exit 1
   fi
 }
-unpack_db_dump
 
 replace_in_file() {
-  if [[ ! -z "${replace_table_prefix_from}" ]] &&  [[ $replace_table_prefix_from != $replace_table_prefix_to ]]; then
+  if [[ ! -z "${replace_table_prefix_from}" ]] && [[ $replace_table_prefix_from != $replace_table_prefix_to ]]; then
     if [[ -z "${replace_table_prefix_to}" ]]; then
       replace_table_prefix_to='keitaro_'
     fi
     sed -i "s/$replace_table_prefix_from/$replace_table_prefix_to/" $1
-    echo "replace table prefix from ${replace_table_prefix_from} to ${replace_table_prefix_to}"
   fi
 }
 
-make_micro_dumps() {
+adapt_chunks_to_micro_dumps() {
   mv table00 head
   for file in `ls -1 table*`; do
     table_name=`head -n1 $file | cut -d$'\x60' -f2`
@@ -138,13 +146,11 @@ make_micro_dumps() {
   done
   echo "Split to micro dumps successfully completed"
 }
-make_micro_dumps
 
 clean_up_db() {
   rm prepend.sql append.sql head table*
   mysql -e "DROP DATABASE $db_name; CREATE DATABASE $db_name"
 }
-clean_up_db
 
 mysql_import(){
   mysql $2 < $1
@@ -163,7 +169,9 @@ async_restore_dump() {
   wait "${pids[@]}"
   echo "Async dump restore successfully completed"
 }
-async_restore_dump
-rm -rf ../$DUMP_DIR ../${dump_file}
+
+remove_dump_dir() {
+  rm -rf $dump_dir
+}
 
 echo "Some parts of the dump will be imported in background. "
