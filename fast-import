@@ -154,7 +154,6 @@ remove_dump_dir() {
 
   ensure_options_are_valid
 
-parse_options
 ensure_nobody_is_using_database
 
 make_dump_dir
