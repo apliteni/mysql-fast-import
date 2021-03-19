@@ -161,6 +161,5 @@ make_micro_dumps
 clean_up_db
 mysql_import
 async_restore_dump
-remove_dump_dir
 
 echo "Some parts of the dump will be imported in background. "
