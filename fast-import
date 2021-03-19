@@ -3,17 +3,6 @@
 dump_dir=$(mktemp -d)
 force_import=false
 
-parse_options
-ensure_options_are_valid
-ensure_nobody_is_using_database
-
-make_dump_dir
-make_micro_dumps
-clean_up_db
-mysql_import
-async_restore_dump
-remove_dump_dir
-
 show_help() {
   echo "Usage $0 -F DUMP_FILE [-d DATABASE_NAME] [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO]"
   echo "Example: $0 -F backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct"
@@ -170,5 +159,16 @@ async_restore_dump() {
 remove_dump_dir() {
   rm -rf $dump_dir
 }
+
+parse_options
+ensure_options_are_valid
+ensure_nobody_is_using_database
+
+make_dump_dir
+make_micro_dumps
+clean_up_db
+mysql_import
+async_restore_dump
+remove_dump_dir
 
 echo "Some parts of the dump will be imported in background. "
