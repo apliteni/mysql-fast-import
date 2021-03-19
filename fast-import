@@ -40,7 +40,7 @@ ensure_options_are_valid() {
 
 make_dump_dir() {
   dump_dir=$(mktemp -d)
-  cd dump_dir
+  cd $dump_dir
 }
 
 make_micro_dumps() {
