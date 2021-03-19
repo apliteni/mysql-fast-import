@@ -62,8 +62,7 @@ generate_micro_dump_optimization_sql () {
 }
 
 unpack_db_dump_to_chunks() {
-  pushd $dump_path
-  if gzip -dc ${dump_path} | csplit -s -ftable - "/-- Table structure for table/" {*}; then
+  if gzip -dc /root/${dump_path} | csplit -s -ftable - "/-- Table structure for table/" {*}; then
     echo 'Success split dump tables'
   else
     echo -e '\e[31mDump tables split failed\e[0m'
