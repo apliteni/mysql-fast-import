@@ -8,47 +8,6 @@ show_help() {
   exit 1
 }
 
-parse_options() {
-  while getopts "F:d:a:r:t:f" opt; do
-    case $opt in
-        h)
-            show_help
-            exit 0
-            ;;
-        F)  dump_path=$OPTARG
-            ;;
-        d)  db_name=$OPTARG
-            ;;
-        a)  asynchronously_imported_tables_regex=$OPTARG
-            ;;
-        r)  replace_table_prefix_from=$OPTARG
-            ;;
-        t)  replace_table_prefix_to=$OPTARG
-            ;;
-        f) force_import=true
-            ;;
-        \? ) echo "Invalid option: $OPTARG" 1>&2
-            show_help >&2
-            ;;
-    esac
-  done
-
-  if [[ "$force_import" = false ]]; then
-    exec 3<>/dev/tty
-    read -u 3 -p "This script will destroy the data in the keitaro database, are you sure you want to continue (yes|no)" yn
-    case $yn in
-        [Yy]*) ;;
-        [Nn]*) exit
-               ;;
-        * )    echo "Please answer yes or no."
-               exit
-               ;;
-    esac
-  fi
-
-  ensure_options_are_valid
-}
-
 ensure_nobody_is_using_database() {
   local parallel_processes_list=$(mysql --execute='SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST WHERE COMMAND = "Query" AND DB = "keitaro"';)
   if [[ $parallel_processes_list ]]; then
@@ -155,6 +114,45 @@ async_restore_dump() {
 remove_dump_dir() {
   rm -rf $dump_dir
 }
+
+  while getopts "F:d:a:r:t:f" opt; do
+    case $opt in
+        h)
+            show_help
+            exit 0
+            ;;
+        F)  dump_path=$OPTARG
+            ;;
+        d)  db_name=$OPTARG
+            ;;
+        a)  asynchronously_imported_tables_regex=$OPTARG
+            ;;
+        r)  replace_table_prefix_from=$OPTARG
+            ;;
+        t)  replace_table_prefix_to=$OPTARG
+            ;;
+        f) force_import=true
+            ;;
+        \? ) echo "Invalid option: $OPTARG" 1>&2
+            show_help >&2
+            ;;
+    esac
+  done
+
+  if [[ "$force_import" = false ]]; then
+    exec 3<>/dev/tty
+    read -u 3 -p "This script will destroy the data in the keitaro database, are you sure you want to continue (yes|no)" yn
+    case $yn in
+        [Yy]*) ;;
+        [Nn]*) exit
+               ;;
+        * )    echo "Please answer yes or no."
+               exit
+               ;;
+    esac
+  fi
+
+  ensure_options_are_valid
 
 parse_options
 ensure_nobody_is_using_database
