@@ -130,9 +130,6 @@ unpack_db_dump_to_chunks() {
 
 replace_in_file() {
   if [[ ! -z "${replace_table_prefix_from}" ]] && [[ $replace_table_prefix_from != $replace_table_prefix_to ]]; then
-    if [[ -z "${replace_table_prefix_to}" ]]; then
-      replace_table_prefix_to='keitaro_'
-    fi
     sed -i "s/$replace_table_prefix_from/$replace_table_prefix_to/" $1
   fi
 }
