@@ -63,6 +63,7 @@ generate_micro_dump_optimization_sql () {
 }
 
 unpack_db_dump_to_chunks() {
+  dump_path=$(realpath $dump_path)
   pushd "${dump_path}"
   if gzip -dc ${dump_path} | csplit -s -ftable - "/-- Table structure for table/" {*}; then
     echo 'Success split dump tables'
