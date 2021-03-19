@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-dump_dir=$(mktemp -d)
 force_import=false
 
 show_help() {
