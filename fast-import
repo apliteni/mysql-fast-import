@@ -9,7 +9,7 @@ show_help() {
 }
 
 parse_options() {
-  while getopts ":A:K:U:P:F:S:ra:t:i:k:L:l:hvpsw" opt; do
+  while getopts "F:d:a:r:t:f" opt; do
     case $opt in
         h)
             show_help
