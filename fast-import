@@ -38,6 +38,49 @@ ensure_options_are_valid() {
   fi
 }
 
+parse_options() {
+  while getopts "F:d:a:r:t:f" opt; do
+    argument=$OPTARG
+    case $opt in
+        h)
+            show_help
+            exit 0
+            ;;
+        F)  dump_path=$argument
+            ;;
+        d)  db_name=$argument
+            ;;
+        a)  asynchronously_imported_tables_regex=$argument
+            ;;
+        r)  replace_table_prefix_from=$argument
+            ;;
+        t)  replace_table_prefix_to=$argument
+            ;;
+        f) force_import=true
+            ;;
+        \? ) echo "Invalid option: $argument" 1>&2
+            show_help >&2
+            ;;
+    esac
+  done
+
+  if [[ "$force_import" = false ]]; then
+    exec 3<>/dev/tty
+    read -u 3 -p "This script will destroy the data in the keitaro database, are you sure you want to continue (yes|no)" yn
+    case $yn in
+        [Yy]*) ;;
+        [Nn]*) exit
+               ;;
+        * )    echo "Please answer yes or no."
+               exit
+               ;;
+    esac
+  fi
+
+  ensure_options_are_valid
+  ensure_nobody_is_using_database
+}
+
 make_dump_dir() {
   dump_dir=$(mktemp -d)
   cd $dump_dir
@@ -114,51 +157,13 @@ remove_dump_dir() {
   rm -rf $dump_dir
 }
 
-  while getopts "F:d:a:r:t:f" opt; do
-    case $opt in
-        h)
-            show_help
-            exit 0
-            ;;
-        F)  dump_path=$OPTARG
-            ;;
-        d)  db_name=$OPTARG
-            ;;
-        a)  asynchronously_imported_tables_regex=$OPTARG
-            ;;
-        r)  replace_table_prefix_from=$OPTARG
-            ;;
-        t)  replace_table_prefix_to=$OPTARG
-            ;;
-        f) force_import=true
-            ;;
-        \? ) echo "Invalid option: $OPTARG" 1>&2
-            show_help >&2
-            ;;
-    esac
-  done
-
-if [[ "$force_import" = false ]]; then
-  exec 3<>/dev/tty
-  read -u 3 -p "This script will destroy the data in the keitaro database, are you sure you want to continue (yes|no)" yn
-  case $yn in
-      [Yy]*) ;;
-      [Nn]*) exit
-             ;;
-      * )    echo "Please answer yes or no."
-             exit
-             ;;
-  esac
-fi
-
-ensure_options_are_valid
-
-ensure_nobody_is_using_database
+parse_options
 
 make_dump_dir
 make_micro_dumps
 clean_up_db
 mysql_import
 async_restore_dump
+remove_dump_dir
 
 echo "Some parts of the dump will be imported in background. "
