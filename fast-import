@@ -40,9 +40,10 @@ ensure_options_are_valid() {
 }
 
 parse_options() {
-  while getopts "F:d:a:r:t:f" opt; do
-    local argument=$OPTARG
-    case $opt in
+  while getopts "F:d:a:r:t:f" option; do
+  argument=$OPTARG
+  ARGS["${option}"]="${argument}"
+    case $option in
         h)
             show_help
             exit 0
