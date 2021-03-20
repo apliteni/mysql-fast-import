@@ -3,7 +3,8 @@
 force_import=false
 
 show_help() {
-  echo "Usage $0 -F DUMP_FILE [-d DATABASE_NAME] [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO]"
+  echo ""
+  echo "Usage: $0 -F DUMP_FILE [-d DATABASE_NAME] [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO]"
   echo "Example: $0 -F backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct"
   exit 1
 }
@@ -18,7 +19,7 @@ ensure_nobody_is_using_database() {
 
 ensure_options_are_valid() {
   if [[ -z "${dump_path}" ]]; then
-    echo "-d is required"
+    echo "-d parameter is required"
     show_help
   fi
 
