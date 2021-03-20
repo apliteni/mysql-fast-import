@@ -40,7 +40,7 @@ ensure_options_are_valid() {
 
 parse_options() {
   while getopts "F:d:a:r:t:f" opt; do
-    argument=$OPTARG
+    local argument=$OPTARG
     case $opt in
         h)
             show_help
