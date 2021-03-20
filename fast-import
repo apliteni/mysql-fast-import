@@ -157,7 +157,7 @@ remove_dump_dir() {
   rm -rf $dump_dir
 }
 
-parse_options
+parse_options "$@"
 
 make_dump_dir
 make_micro_dumps
