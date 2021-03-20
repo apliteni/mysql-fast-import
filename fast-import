@@ -9,36 +9,6 @@ show_help() {
   exit 1
 }
 
-ensure_nobody_is_using_database() {
-  local parallel_processes_list=$(mysql --execute='SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST WHERE COMMAND = "Query" AND DB = "keitaro"';)
-  if [[ $parallel_processes_list ]]; then
-    echo "Database Keitaro used by another process"
-    exit 1
-  fi
-}
-
-ensure_options_are_valid() {
-  if [[ -z "${dump_path}" ]]; then
-    echo "-d parameter is required"
-    show_help
-  fi
-
-  if [[ ! -f "$dump_path" ]]; then
-      echo "keitaro dump does not exists"
-      exit 1
-  fi
-
-  if [[ -z "${db_name}" ]]; then
-      echo "database name does not set"
-      exit 1
-  fi
-
-  if [[ -z "${asynchronously_imported_tables_regex}" ]]; then
-      echo "tables name does not set"
-      exit 1
-  fi
-}
-
 parse_options() {
   while getopts "F:d:a:r:t:f" option; do
   argument=$OPTARG
@@ -78,9 +48,36 @@ parse_options() {
                ;;
     esac
   fi
+}
 
-  ensure_options_are_valid
-  ensure_nobody_is_using_database
+ensure_nobody_is_using_database() {
+  local parallel_processes_list=$(mysql --execute='SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST WHERE COMMAND = "Query" AND DB = "keitaro"';)
+  if [[ $parallel_processes_list ]]; then
+    echo "Database Keitaro used by another process"
+    exit 1
+  fi
+}
+
+ensure_options_are_valid() {
+  if [[ -z "${dump_path}" ]]; then
+    echo "-d parameter is required"
+    show_help
+  fi
+
+  if [[ ! -f "$dump_path" ]]; then
+      echo "keitaro dump does not exists"
+      exit 1
+  fi
+
+  if [[ -z "${db_name}" ]]; then
+      echo "database name does not set"
+      exit 1
+  fi
+
+  if [[ -z "${asynchronously_imported_tables_regex}" ]]; then
+      echo "tables name does not set"
+      exit 1
+  fi
 }
 
 make_dump_dir() {
@@ -160,6 +157,8 @@ remove_dump_dir() {
 }
 
 parse_options "$@"
+ensure_options_are_valid
+ensure_nobody_is_using_database
 
 make_dump_dir
 make_micro_dumps
