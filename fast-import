@@ -80,28 +80,28 @@ ensure_options_are_valid() {
   fi
 }
 
-make_dump_dir() {
-  dump_dir=$(mktemp -d)
-  cd $dump_dir
+make_temporary_working_dir() {
+  tmp_dir=$(mktemp -d)
 }
 
 make_micro_dumps() {
-  generate_micro_dump_optimization_sql
+  generate_micro_dump_optimization_sql "${tmp_dir}"
   unpack_db_dump_to_chunks
   replace_in_file
   adapt_chunks_to_micro_dumps
 }
 
 generate_micro_dump_optimization_sql () {
+  working_dir="${1}"
   prepend="SET GLOBAL max_connections = 200;"
   prepend="$prepend SET UNIQUE_CHECKS = 0; "
   prepend="$prepend SET AUTOCOMMIT = 0; "
-  echo $prepend > $dump_dir/prepend.sql
+  echo $prepend > $working_dir/prepend.sql
 
   append="SET UNIQUE_CHECKS = 1; "
   append="$append SET AUTOCOMMIT = 1; "
   append="$append COMMIT ; "
-  echo $append > $dump_dir/append.sql
+  echo $append > $working_dir/append.sql
 }
 
 unpack_db_dump_to_chunks() {
@@ -152,19 +152,21 @@ async_restore_dump() {
   echo "Async dump restore successfully completed"
 }
 
-remove_dump_dir() {
-  rm -rf $dump_dir
+remove_temporary_working_dir() {
+  rm -rf $working_dir
 }
 
 parse_options "$@"
 ensure_options_are_valid
 ensure_nobody_is_using_database
 
-make_dump_dir
+make_temporary_working_dir
+cd $tmp_dir
 make_micro_dumps
 clean_up_db
 mysql_import
 async_restore_dump
-remove_dump_dir
+cd
+remove_temporary_working_dir $working_dir
 
 echo "Some parts of the dump will be imported in background. "
