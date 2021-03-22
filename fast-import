@@ -162,7 +162,7 @@ ensure_options_are_valid
 ensure_nobody_is_using_database
 
 working_dir=$(make_temporary_working_dir)
-cd working_dir
+cd $working_dir
 make_micro_dumps $working_dir
 clean_up_db
 mysql_import
