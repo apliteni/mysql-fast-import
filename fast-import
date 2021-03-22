@@ -80,7 +80,7 @@ ensure_options_are_valid() {
   fi
 }
 
-make_temporary_working_dir() {
+make_dump_dir() {
   mktemp -d
 }
 
@@ -161,7 +161,7 @@ parse_options "$@"
 ensure_options_are_valid
 ensure_nobody_is_using_database
 
-working_dir=$(make_temporary_working_dir)
+working_dir=$(make_dump_dir)
 cd $working_dir
 make_micro_dumps $working_dir
 clean_up_db
