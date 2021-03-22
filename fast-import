@@ -153,7 +153,8 @@ async_restore_dump() {
 }
 
 remove_dir() {
-  rm -rf "${1}"
+  local dump_dir="${1}"
+  rm -rf $dump_dir
 }
 
 parse_options "$@"
