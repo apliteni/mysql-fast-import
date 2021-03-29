@@ -130,7 +130,7 @@ adapt_chunks_to_micro_dumps() {
 }
 
 clean_up_db() {
-  #rm prepend.sql append.sql head table*
+  rm prepend.sql append.sql head table*
   mysql -e "DROP DATABASE $db_name; CREATE DATABASE $db_name"
 }
 
