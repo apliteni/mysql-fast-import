@@ -10,7 +10,7 @@ show_help() {
 }
 
 parse_options() {
-  while getopts "F:d:a:r:t:f" option; do
+  while getopts "F:d:a:r:t:v:f" option; do
   argument=$OPTARG
   ARGS["${option}"]="${argument}"
     case $option in
@@ -28,7 +28,7 @@ parse_options() {
             ;;
         t)  replace_table_prefix_to=$argument
             ;;
-        c)  tables_name=$argument
+        v)  tables_name=$argument
             ;;
         f) force_import=true
             ;;
