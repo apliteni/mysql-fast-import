@@ -62,7 +62,7 @@ ensure_nobody_is_using_database() {
 
 ensure_options_are_valid() {
   if [[ -z "${dump_path}" ]]; then
-    echo "-d parameter is required"
+    echo "-F parameter is required"
     show_help
   fi
 
