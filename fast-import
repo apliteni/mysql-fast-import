@@ -83,7 +83,7 @@ ensure_options_are_valid() {
 }
 
 ensure_dump_is_valid() {
-  prefixes=$tables_name
+  local prefixes=$tables_name
 
   for prefix in $prefixes; do
     if ! ls ${prefix}* > /dev/null 2>&1; then
