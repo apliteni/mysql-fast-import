@@ -82,7 +82,7 @@ ensure_options_are_valid() {
   fi
 }
 
-ensure_keitaro_dump_is_valid() {
+ensure_dump_is_valid() {
   prefixes=$tables_name
 
   for prefix in $prefixes; do
