@@ -4,8 +4,8 @@ force_import=false
 
 show_help() {
   echo ""
-  echo "Usage: $0 -F DUMP_FILE [-d DATABASE_NAME] [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO] [-v TABLES_NAME]"
-  echo "Example: $0 -F backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct -v \"keitaro_ schema_version\""
+  echo "Usage: $0 -F DUMP_FILE [-d DATABASE_NAME] [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO]"
+  echo "Example: $0 -F backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct"
   exit 1
 }
 
@@ -28,7 +28,7 @@ parse_options() {
             ;;
         t)  replace_table_prefix_to=$argument
             ;;
-        v)  tables_name=$argument
+        v)  validated_tables=$argument
             ;;
         f) force_import=true
             ;;
@@ -83,7 +83,7 @@ ensure_options_are_valid() {
 }
 
 ensure_dump_is_valid() {
-  local prefixes=$tables_name
+  local prefixes="${validated_tables}"
 
   for prefix in $prefixes; do
     if ! ls ${prefix}* > /dev/null 2>&1; then
@@ -177,7 +177,6 @@ ensure_nobody_is_using_database
 working_dir=$(make_dump_dir)
 cd $working_dir
 make_micro_dumps $working_dir
-ensure_keitaro_dump_is_valid
 clean_up_db
 mysql_import
 async_restore_dump
