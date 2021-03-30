@@ -4,8 +4,8 @@ force_import=false
 
 show_help() {
   echo ""
-  echo "Usage: $0 -F DUMP_FILE [-d DATABASE_NAME] [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO]"
-  echo "Example: $0 -F backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct"
+  echo "Usage: $0 -F DUMP_FILE [-d DATABASE_NAME] [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO] [-v TABLES_NAME]"
+  echo "Example: $0 -F backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct -v \"keitaro_ schema_version\""
   exit 1
 }
 
@@ -22,7 +22,7 @@ parse_options() {
             ;;
         d)  db_name=$argument
             ;;
-        a)  asynchronously_imported_tables_regex=$argument
+        v)  asynchronously_imported_tables_regex=$argument
             ;;
         r)  replace_table_prefix_from=$argument
             ;;
