@@ -28,6 +28,8 @@ parse_options() {
             ;;
         t)  replace_table_prefix_to=$argument
             ;;
+        c)  tables_name=$argument
+            ;;
         f) force_import=true
             ;;
         \? ) echo "Invalid option: $argument" 1>&2
@@ -78,6 +80,17 @@ ensure_options_are_valid() {
       echo "tables name does not set"
       exit 1
   fi
+}
+
+ensure_keitaro_dump_is_valid() {
+  prefixes=$tables_name
+
+  for prefix in $prefixes; do
+    if ! ls ${prefix}* > /dev/null 2>&1; then
+      echo -e "\e[31mTable with prefix ${prefix} does not exist\e[0m"
+      exit 1
+    fi
+  done
 }
 
 make_dump_dir() {
@@ -164,6 +177,7 @@ ensure_nobody_is_using_database
 working_dir=$(make_dump_dir)
 cd $working_dir
 make_micro_dumps $working_dir
+ensure_keitaro_dump_is_valid
 clean_up_db
 mysql_import
 async_restore_dump
