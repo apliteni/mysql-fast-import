@@ -178,7 +178,6 @@ working_dir=$(make_dump_dir)
 cd $working_dir
 make_micro_dumps $working_dir
 clean_up_db
-mysql_import
 async_restore_dump
 cd
 remove_dir $working_dir
