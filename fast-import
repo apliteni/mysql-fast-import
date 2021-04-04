@@ -180,6 +180,6 @@ make_micro_dumps $working_dir
 clean_up_db
 async_restore_dump
 cd
-remove_dir $working_dir
+
 
 echo "Some parts of the dump will be imported in background. "
