@@ -150,6 +150,20 @@ mysql_import(){
   mysql $2 < $1
 }
 
+async_restore_dump() {
+  for file in *; do
+    mysql_import "$file" "$db_name" &
+
+    table_name=${file%".sql"}
+    if [[ ! "$table_name" =~ $asynchronously_imported_tables_regex ]]; then
+      pids+=($!)
+    fi
+  done
+
+  wait "${pids[@]}"
+  echo "Async dump restore successfully completed"
+}
+
 remove_dir() {
   local dump_dir="${1}"
   rm -rf $dump_dir
@@ -163,17 +177,7 @@ working_dir=$(make_dump_dir)
 cd $working_dir
 make_micro_dumps $working_dir
 clean_up_db
-for file in *; do
-  mysql_import "$file" "$db_name" &
-
-  table_name=${file%".sql"}
-  if [[ ! "$table_name" =~ $asynchronously_imported_tables_regex ]]; then
-    pids+=($!)
-  fi
-done
-
-wait "${pids[@]}"
-echo "Async dump restore successfully completed"
+async_restore_dump
 cd
 remove_dir $working_dir
 
