@@ -100,7 +100,6 @@ make_dump_dir() {
 make_micro_dumps() {
   generate_micro_dump_optimization_sql "${1}"
   unpack_db_dump_to_chunks
-  replace_in_file
   adapt_chunks_to_micro_dumps
 }
 
@@ -156,7 +155,7 @@ async_restore_dump() {
     mysql_import "$file" "$db_name" &
 
     table_name=${file%".sql"}
-    if [[ ! "$table_name" =~ $asynchronously_imported_tables_regex ]]; then
+    if [[ ! "$table_name" =~ "$asynchronously_imported_tables_regex" ]]; then
       pids+=($!)
     fi
   done
