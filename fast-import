@@ -156,7 +156,7 @@ async_restore_dump() {
     mysql_import "$file" "$db_name" &
 
     table_name=${file%".sql"}
-    if [[ "$table_name" =~ $asynchronously_imported_tables_regex ]]; then
+    if [[ ! "$table_name" =~ $asynchronously_imported_tables_regex ]]; then
       pids+=($!)
     fi
   done
