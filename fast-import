@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-
 force_import=false
 
 show_help() {
   echo ""
-  echo "Usage: $0 -F DUMP_FILE [-d DATABASE_NAME] [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO]"
-  echo "Example: $0 -F backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct"
+  echo "Usage: $0 -F DUMP_FILE [-d DATABASE_NAME] [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO] [-H host]"
+  echo "Example: $0 -F backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct -H localhost"
   exit 1
 }
 
 parse_options() {
-  while getopts "F:d:a:r:t:v:f" option; do
+  while getopts "F:d:a:r:t:v:f:H:" option; do
   argument=$OPTARG
   ARGS["${option}"]="${argument}"
     case $option in
@@ -19,6 +18,8 @@ parse_options() {
             exit 0
             ;;
         F)  dump_path=$argument
+            ;;
+        H) host=$argument
             ;;
         d)  db_name=$argument
             ;;
@@ -37,6 +38,11 @@ parse_options() {
             ;;
     esac
   done
+  if [[ -z "$host" ]]; then
+    mysql_host="-h localhost"
+  else
+    mysql_host="-h $host"
+  fi
 
   if [[ "$force_import" = false ]]; then
     exec 3<>/dev/tty
@@ -53,7 +59,7 @@ parse_options() {
 }
 
 ensure_nobody_is_using_database() {
-  local parallel_processes_list=$(mysql --execute='SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST WHERE COMMAND = "Query" AND DB = "keitaro"';)
+  local parallel_processes_list=$(mysql $mysql_host --execute='SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST WHERE COMMAND = "Query" AND DB = "keitaro"';)
   if [[ $parallel_processes_list ]]; then
     echo "Database Keitaro used by another process"
     exit 1
@@ -117,7 +123,7 @@ generate_micro_dump_optimization_sql () {
 }
 
 unpack_db_dump_to_chunks() {
-  if gzip -dc /root/${dump_path} | csplit -s -ftable - "/-- Table structure for table/" {*}; then
+  if gzip -dc ${dump_path} | csplit -s -ftable - "/-- Table structure for table/" {*}; then
     echo 'Success split dump tables'
   else
     echo -e '\e[31mDump tables split failed\e[0m'
@@ -143,11 +149,11 @@ adapt_chunks_to_micro_dumps() {
 
 clean_up_db() {
   rm prepend.sql append.sql head table*
-  mysql -e "DROP DATABASE $db_name; CREATE DATABASE $db_name"
+  mysql $mysql_host -e "DROP DATABASE $db_name; CREATE DATABASE $db_name"
 }
 
 mysql_import(){
-  mysql $2 < $1
+  nohup mysql $mysql_host $2 < $1 > /dev/null 2>&1
 }
 
 async_restore_dump() {
