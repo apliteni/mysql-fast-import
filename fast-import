@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-
-force_import=false
+force_import=""
 
 show_help() {
   echo ""
-  echo "Usage: $0 -F DUMP_FILE [-d DATABASE_NAME] [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO]"
-  echo "Example: $0 -F backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct"
+  echo "Usage: $0 -F DUMP_FILE [-d DATABASE_NAME] [-a ASYNC_TABLE_NAMES] [-r REPLACE_FROM] [-t REPLACE_TO] [-H host]"
+  echo "Example: $0 -F backup.sql.gz -d booking -a \"table_name|table2_name\" -f incorrect -t correct -H localhost"
   exit 1
 }
 
 parse_options() {
-  while getopts "F:d:a:r:t:v:f" option; do
+  while getopts "F:d:a:r:t:v:H:h,f" option; do
   argument=$OPTARG
   ARGS["${option}"]="${argument}"
     case $option in
@@ -19,6 +18,8 @@ parse_options() {
             exit 0
             ;;
         F)  dump_path=$argument
+            ;;
+        H) host=$argument
             ;;
         d)  db_name=$argument
             ;;
@@ -30,15 +31,20 @@ parse_options() {
             ;;
         v)  validated_tables=$argument
             ;;
-        f) force_import=true
+        f) force_import="true"
             ;;
         \? ) echo "Invalid option: $argument" 1>&2
             show_help >&2
             ;;
     esac
   done
+  if [[ -z "$host" ]]; then
+    mysql_host="-h localhost"
+  else
+    mysql_host="-h $host"
+  fi
 
-  if [[ "$force_import" = false ]]; then
+  if [[ "${force_import}" == "" ]]; then
     exec 3<>/dev/tty
     read -u 3 -p "This script will destroy the data in the keitaro database, are you sure you want to continue (yes|no)" yn
     case $yn in
@@ -53,7 +59,7 @@ parse_options() {
 }
 
 ensure_nobody_is_using_database() {
-  local parallel_processes_list=$(mysql --execute='SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST WHERE COMMAND = "Query" AND DB = "keitaro"';)
+  local parallel_processes_list=$(mysql $mysql_host --execute='SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST WHERE COMMAND = "Query" AND DB = "keitaro"';)
   if [[ $parallel_processes_list ]]; then
     echo "Database Keitaro used by another process"
     exit 1
@@ -117,7 +123,7 @@ generate_micro_dump_optimization_sql () {
 }
 
 unpack_db_dump_to_chunks() {
-  if gzip -dc /root/${dump_path} | csplit -s -ftable - "/-- Table structure for table/" {*}; then
+  if gzip -dc ${dump_path} | awk -v file_name=table0 '/^-- Table structure for table/{file_name="table"++i;}(file_name){print > file_name;}'; then
     echo 'Success split dump tables'
   else
     echo -e '\e[31mDump tables split failed\e[0m'
@@ -132,7 +138,7 @@ replace_in_file() {
 }
 
 adapt_chunks_to_micro_dumps() {
-  mv table00 head
+  mv table0 head
   for file in `ls -1 table*`; do
     table_name=`head -n1 $file | cut -d$'\x60' -f2`
     cat head prepend.sql $file append.sql > "$table_name.sql"
@@ -143,11 +149,11 @@ adapt_chunks_to_micro_dumps() {
 
 clean_up_db() {
   rm prepend.sql append.sql head table*
-  mysql -e "DROP DATABASE $db_name; CREATE DATABASE $db_name"
+  mysql $mysql_host -e "DROP DATABASE $db_name; CREATE DATABASE $db_name"
 }
 
 mysql_import(){
-  mysql $2 < $1
+  nohup mysql $mysql_host $2 < $1 > /dev/null 2>&1
 }
 
 async_restore_dump() {
