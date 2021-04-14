@@ -103,6 +103,14 @@ make_dump_dir() {
   mktemp -d
 }
 
+define_handling_command() {
+  if [[ ${1##*.} == "gz" ]]; then
+    echo "zcat"
+  else
+    echo "cat"
+  fi
+}
+
 make_micro_dumps() {
   generate_micro_dump_optimization_sql "${1}"
   unpack_db_dump_to_chunks
@@ -123,7 +131,8 @@ generate_micro_dump_optimization_sql () {
 }
 
 unpack_db_dump_to_chunks() {
-  if gzip -dc ${dump_path} | awk -v file_name=table0 '/^-- Table structure for table/{file_name="table"++i;}(file_name){print > file_name;}'; then
+  local
+  if  $(define_handling_command ${dump_path}) ${dump_path} | awk -v file_name=table0 '/^-- Table structure for table/{file_name="table"++i;}(file_name){print > file_name;}'; then
     echo 'Success split dump tables'
   else
     echo -e '\e[31mDump tables split failed\e[0m'
@@ -181,7 +190,7 @@ ensure_nobody_is_using_database
 
 working_dir=$(make_dump_dir)
 cd $working_dir
-make_micro_dumps $working_dir
+make_micro_dumps ${working_dir}
 clean_up_db
 async_restore_dump
 cd
