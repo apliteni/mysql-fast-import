@@ -58,6 +58,15 @@ parse_options() {
   fi
 }
 
+define_dump_path() {
+  local dump_path=${1}
+  if [[ $(dirname ${dump_path}) == '.' ]]; then
+    echo $(pwd)/$(basename ${dump_path})
+  else
+    echo ${dump_path}
+  fi
+}
+
 ensure_nobody_is_using_database() {
   local parallel_processes_list=$(mysql $mysql_host --execute='SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST WHERE COMMAND = "Query" AND DB = "keitaro"';)
   if [[ $parallel_processes_list ]]; then
@@ -185,9 +194,9 @@ remove_dir() {
 }
 
 parse_options "$@"
+dump_path=$(define_dump_path ${dump_path})
 ensure_options_are_valid
 ensure_nobody_is_using_database
-
 working_dir=$(make_dump_dir)
 cd $working_dir
 make_micro_dumps ${working_dir}
