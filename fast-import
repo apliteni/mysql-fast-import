@@ -9,7 +9,7 @@ show_help() {
 }
 
 parse_options() {
-  while getopts "F:d:a:r:t:v:H:h,f" option; do
+  while getopts "F:d:a:r:t:v:H:hf" option; do
   argument=$OPTARG
   ARGS["${option}"]="${argument}"
     case $option in
@@ -98,11 +98,11 @@ ensure_options_are_valid() {
 }
 
 ensure_dump_is_valid() {
-  local prefixes="${validated_tables}"
+  local tables_name="${validated_tables}"
 
-  for prefix in $prefixes; do
-    if ! ls ${prefix}* > /dev/null 2>&1; then
-      echo -e "\e[31mTable with prefix ${prefix} does not exist\e[0m"
+  for table_name in $tables_name; do
+    if [[ ! -f ${table_name}.sql ]]; then
+      echo -e "\e[31mTable with prefix ${table_name}.sql does not exist\e[0m"
       exit 1
     fi
   done
@@ -149,19 +149,21 @@ unpack_db_dump_to_chunks() {
   fi
 }
 
-replace_in_file() {
+rename_table_prefix() {
   if [[ ! -z "${replace_table_prefix_from}" ]] && [[ $replace_table_prefix_from != $replace_table_prefix_to ]]; then
-    sed -i "s/$replace_table_prefix_from/$replace_table_prefix_to/" $1
+    sed "s/$replace_table_prefix_from/$replace_table_prefix_to/"
+  else
+    cat
   fi
 }
 
 adapt_chunks_to_micro_dumps() {
   mv table0 head
-  for file in `ls -1 table*`; do
-    table_name=`head -n1 $file | cut -d$'\x60' -f2`
-    cat head prepend.sql $file append.sql > "$table_name.sql"
-    replace_in_file "$table_name.sql"
+  for file in table*; do
+    table_name=$(head -n1 $file | cut -d$'\x60' -f2)
+    cat head prepend.sql $file append.sql | rename_table_prefix > "$table_name.sql"
   done
+  ensure_dump_is_valid
   echo "Split to micro dumps successfully completed"
 }
 
@@ -198,11 +200,11 @@ dump_path=$(define_dump_path ${dump_path})
 ensure_options_are_valid
 ensure_nobody_is_using_database
 working_dir=$(make_dump_dir)
-cd $working_dir
+pushd $working_dir || { echo "Failure to change directory"; exit 1; }
 make_micro_dumps ${working_dir}
 clean_up_db
 async_restore_dump
-cd
+popd || { echo "Failure to change working directory"; exit 1; }
 remove_dir $working_dir
 
 echo "Some parts of the dump will be imported in background. "
