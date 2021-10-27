@@ -39,9 +39,9 @@ parse_options() {
     esac
   done
   if [[ -z "$host" ]]; then
-    mysql_host="-h localhost"
+    mysql_host="localhost"
   else
-    mysql_host="-h $host"
+    mysql_host="$host"
   fi
 
   if [[ "${force_import}" == "" ]]; then
@@ -60,15 +60,15 @@ parse_options() {
 
 define_dump_path() {
   local dump_path=${1}
-  if [[ $(dirname ${dump_path}) == '.' ]]; then
-    echo $(pwd)/$(basename ${dump_path})
+  if [[ $(dirname "${dump_path}") == '.' ]]; then
+    echo $(pwd)/$(basename "${dump_path}")
   else
-    echo ${dump_path}
+    echo "${dump_path}"
   fi
 }
 
 ensure_nobody_is_using_database() {
-  local parallel_processes_list=$(mysql $mysql_host --execute='SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST WHERE COMMAND = "Query" AND DB = "keitaro"';)
+  local parallel_processes_list=$(mysql --host="$mysql_host" --execute='SELECT * FROM INFORMATION_SCHEMA.PROCESSLIST WHERE COMMAND = "Query" AND DB = "keitaro"';)
   if [[ $parallel_processes_list ]]; then
     echo "Database Keitaro used by another process"
     exit 1
@@ -131,17 +131,17 @@ generate_micro_dump_optimization_sql () {
   prepend="SET GLOBAL max_connections = 200;"
   prepend="$prepend SET UNIQUE_CHECKS = 0; "
   prepend="$prepend SET AUTOCOMMIT = 0; "
-  echo $prepend > $dump_dir/prepend.sql
+  echo "$prepend" > "$dump_dir/prepend.sql"
 
   append="SET UNIQUE_CHECKS = 1; "
   append="$append SET AUTOCOMMIT = 1; "
   append="$append COMMIT ; "
-  echo $append > $dump_dir/append.sql
+  echo "$append" > "$dump_dir/append.sql"
 }
 
 unpack_db_dump_to_chunks() {
   local
-  if  $(define_handling_command ${dump_path}) ${dump_path} | awk -v file_name=table0 '/^-- Table structure for table/{file_name="table"++i;}(file_name){print > file_name;}'; then
+  if  $(define_handling_command "${dump_path}") "${dump_path}" | awk -v file_name=table0 '/^-- Table structure for table/{file_name="table"++i;}(file_name){print > file_name;}'; then
     echo 'Success split dump tables'
   else
     echo -e '\e[31mDump tables split failed\e[0m'
@@ -160,8 +160,8 @@ rename_table_prefix() {
 adapt_chunks_to_micro_dumps() {
   mv table0 head
   for file in table*; do
-    table_name=$(head -n1 $file | cut -d$'\x60' -f2)
-    cat head prepend.sql $file append.sql | rename_table_prefix > "$table_name.sql"
+    table_name=$(head -n1 "$file" | cut -d$'\x60' -f2)
+    cat head prepend.sql "$file" append.sql | rename_table_prefix > "$table_name.sql"
   done
   ensure_dump_is_valid
   echo "Split to micro dumps successfully completed"
@@ -169,11 +169,11 @@ adapt_chunks_to_micro_dumps() {
 
 clean_up_db() {
   rm prepend.sql append.sql head table*
-  mysql $mysql_host -e "DROP DATABASE $db_name; CREATE DATABASE $db_name"
+  mysql --host="$mysql_host" -e "DROP DATABASE $db_name; CREATE DATABASE $db_name"
 }
 
 mysql_import(){
-  nohup mysql $mysql_host $2 < $1 > /dev/null 2>&1
+  nohup mysql --host="$mysql_host" "$2" < "$1" > /dev/null 2>&1
 }
 
 async_restore_dump() {
@@ -192,19 +192,19 @@ async_restore_dump() {
 
 remove_dir() {
   local dump_dir="${1}"
-  rm -rf $dump_dir
+  rm -rf "$dump_dir"
 }
 
 parse_options "$@"
-dump_path=$(define_dump_path ${dump_path})
+dump_path=$(define_dump_path "${dump_path}")
 ensure_options_are_valid
 ensure_nobody_is_using_database
 working_dir=$(make_dump_dir)
-pushd $working_dir || { echo "Failure to change directory"; exit 1; }
-make_micro_dumps ${working_dir}
+pushd "$working_dir" || { echo "Failure to change directory"; exit 1; }
+make_micro_dumps "${working_dir}"
 clean_up_db
 async_restore_dump
 popd || { echo "Failure to change working directory"; exit 1; }
-remove_dir $working_dir
+remove_dir "$working_dir"
 
 echo "Some parts of the dump will be imported in background. "
